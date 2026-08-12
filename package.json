@@ -1,0 +1,12 @@
+{
+  "name": "food-delivery",
+  "version": "1.0.0",
+  "description": "A real, runnable Uber-Eats-style food ordering & delivery system built specifically to show **Kafka event streaming end-to-end** — five independent Spring Boot microservices talking only through Kafka, a React dashboard to watch it happen live, and a working **replay** demo you can trigger from the UI.",
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
+}

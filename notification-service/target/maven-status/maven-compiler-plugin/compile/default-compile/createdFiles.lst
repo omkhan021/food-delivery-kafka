@@ -1,0 +1,13 @@
+com\fooddelivery\notification\service\NotificationMessageFactory.class
+com\fooddelivery\notification\model\Notification.class
+com\fooddelivery\notification\repository\NotificationRepository.class
+com\fooddelivery\notification\config\WebConfig.class
+com\fooddelivery\notification\kafka\NotificationEventListener.class
+com\fooddelivery\notification\config\KafkaConsumerConfig.class
+com\fooddelivery\notification\service\NotificationService.class
+com\fooddelivery\notification\web\NotificationController.class
+com\fooddelivery\notification\config\DatabaseBootstrapConfig$DatabaseEnsurePostProcessor.class
+com\fooddelivery\notification\config\DatabaseBootstrapConfig.class
+com\fooddelivery\notification\service\SseBroadcaster.class
+com\fooddelivery\notification\NotificationServiceApplication.class
+com\fooddelivery\notification\dto\NotificationDto.class

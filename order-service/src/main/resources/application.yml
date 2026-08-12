@@ -1,0 +1,81 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: order-service
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/fooddelivery
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:admin123}
+
+  flyway:
+    schemas: order_service
+    default-schema: order_service
+    create-schemas: true
+    baseline-on-migrate: true
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        default_schema: order_service
+        format_sql: true
+    show-sql: false
+
+  jackson:
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.add.type.headers: false
+    consumer:
+      group-id: order-status-group
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      # Value is deserialized as a raw String and parsed manually via Jackson ObjectMapper in
+      # KafkaEventConsumerService. This listener subscribes to three topics whose events have
+      # three different JSON shapes (PaymentEvent / KitchenEvent / DeliveryEvent); rather than
+      # configure a JsonDeserializer with type-mapping headers (which the producers don't send,
+      # since spring.json.add.type.headers=false project-wide), we keep the wire format plain
+      # JSON and dispatch on the "eventType"/topic ourselves. This is simpler and more robust
+      # across independently-deployed services that only share a JSON contract, not Java classes.
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
+# Application-specific configuration
+order-service:
+  # Consumer group ids for all 5 services, used by the Kafka admin/replay endpoints.
+  known-consumer-groups:
+    - payment-service-group
+    - kitchen-service-group
+    - delivery-service-group
+    - order-status-group
+    - notification-service-group
+  # Delay (ms) between consuming DELIVERED and auto-transitioning the order to COMPLETED.
+  delivered-to-completed-delay-ms: 2000
+
+cors:
+  allowed-origin: http://localhost:5173
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when-authorized
+
+logging:
+  level:
+    com.fooddelivery.order: INFO
