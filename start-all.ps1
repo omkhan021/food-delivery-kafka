@@ -70,16 +70,16 @@ foreach ($name in $services.Keys) {
     Write-Host "Starting $name (port $($svc.Port))..." -ForegroundColor Cyan
 
     if ($svc.IsBackend) {
-        $envPrefix = "`$env:DB_USERNAME='{0}'; `$env:DB_PASSWORD='{1}'; " -f $DbUsername, $DbPassword
-
+        # MAVEN_OPTS is picked up by the Maven JVM automatically — no quoting issues.
+        # spring-boot:run runs in-process (non-forked) so MAVEN_OPTS reaches the app JVM too.
         if (-not $NoDebug) {
             $jvmArgs = '-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address={0}' -f $svc.DebugPort
-            $mvnCmd  = 'mvn spring-boot:run "-Dspring-boot.run.jvmArguments={0}"' -f $jvmArgs
+            $envPrefix = "`$env:DB_USERNAME='{0}'; `$env:DB_PASSWORD='{1}'; `$env:MAVEN_OPTS='{2}'; " -f $DbUsername, $DbPassword, $jvmArgs
         } else {
-            $mvnCmd  = 'mvn spring-boot:run'
+            $envPrefix = "`$env:DB_USERNAME='{0}'; `$env:DB_PASSWORD='{1}'; " -f $DbUsername, $DbPassword
         }
 
-        $cmd = $envPrefix + $mvnCmd
+        $cmd = $envPrefix + 'mvn spring-boot:run'
     }
     else {
         # Frontend — no DB env, no debug agent; auto npm-install on first run
