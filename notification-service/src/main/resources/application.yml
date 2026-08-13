@@ -49,6 +49,16 @@ management:
   endpoint:
     health:
       show-details: never
+  info:
+    env:
+      enabled: true
+
+info:
+  app:
+    name: notification-service
+    version: 1.0.0
+    description: "Fan-in consumer of all 4 topics — persists notifications, broadcasts global SSE activity feed"
+    port: 8085
 
 logging:
   level:

@@ -1,9 +1,14 @@
-// Central config: base URLs for the two backend services the UI talks to
-// directly (order-service is the aggregator for orders/tracking/admin,
-// notification-service is the fan-in Kafka activity feed). The other three
-// services (payment/kitchen/delivery) are not called directly by the UI.
 export const API_BASE_ORDER =
   import.meta.env.VITE_API_BASE_ORDER || 'http://localhost:8081';
+
+export const API_BASE_PAYMENT =
+  import.meta.env.VITE_API_BASE_PAYMENT || 'http://localhost:8082';
+
+export const API_BASE_KITCHEN =
+  import.meta.env.VITE_API_BASE_KITCHEN || 'http://localhost:8083';
+
+export const API_BASE_DELIVERY =
+  import.meta.env.VITE_API_BASE_DELIVERY || 'http://localhost:8084';
 
 export const API_BASE_NOTIFICATION =
   import.meta.env.VITE_API_BASE_NOTIFICATION || 'http://localhost:8085';

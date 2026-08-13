@@ -1,14 +1,150 @@
 import { useEffect, useRef, useState } from 'react';
-import { getOrder, orderStreamUrl } from '../api';
+import {
+  getOrder, orderStreamUrl,
+  paymentComplete, paymentFail,
+  kitchenPrepare, kitchenReady,
+  deliveryPickup, deliveryEnroute, deliveryDeliver,
+} from '../api';
 import { ORDER_STAGES, STAGE_COLORS } from '../config';
 
 function formatTime(ts) {
   if (!ts) return '';
-  try {
-    return new Date(ts).toLocaleString();
-  } catch {
-    return ts;
+  try { return new Date(ts).toLocaleString(); } catch { return ts; }
+}
+
+/**
+ * Shows the single action (or pair of actions) available for the current order status.
+ * Each button fires the corresponding REST endpoint on the owning microservice, which
+ * publishes a Kafka event. The SSE stream on order-service picks it up and pushes the
+ * status update back to this component automatically.
+ *
+ * Button layout per status:
+ *   PLACED              → (auto: payment-service will publish PAYMENT_PROCESSING shortly)
+ *   PAYMENT_PROCESSING  → [✓ Pay Success]  [✗ Pay Fail]
+ *   RECEIVED_BY_KITCHEN → [🍳 Start Preparing]
+ *   PREPARING           → [✅ Mark Ready]
+ *   PREPARED            → (auto: delivery-service will publish DRIVER_ASSIGNED shortly)
+ *   DRIVER_ASSIGNED     → [📦 Picked Up]
+ *   PICKED_UP           → [🚗 En Route]
+ *   ENROUTE             → [🏠 Delivered]
+ *   DELIVERED / COMPLETED / CANCELLED → nothing
+ */
+function ActionPanel({ status, orderId }) {
+  const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState(null);
+
+  async function trigger(apiFn) {
+    setBusy(true);
+    setActionError(null);
+    try {
+      await apiFn();
+    } catch (e) {
+      setActionError(e.message || 'Action failed');
+    } finally {
+      setBusy(false);
+    }
   }
+
+  const waiting = (msg) => (
+    <div className="action-waiting">
+      <span className="live-dot" /> {msg}
+    </div>
+  );
+
+  let content = null;
+
+  if (status === 'PLACED') {
+    content = waiting('Waiting for payment-service to acknowledge… (PAYMENT_PROCESSING coming via Kafka)');
+  } else if (status === 'PAYMENT_PROCESSING') {
+    content = (
+      <>
+        <p className="action-hint">
+          Simulate the payment gateway result — watch the event land in Kafka-UI and the status update via SSE:
+        </p>
+        <div className="action-buttons">
+          <button
+            className="btn btn-success action-btn"
+            disabled={busy}
+            onClick={() => trigger(() => paymentComplete(orderId))}
+          >
+            ✓ Pay Success
+          </button>
+          <button
+            className="btn btn-danger action-btn"
+            disabled={busy}
+            onClick={() => trigger(() => paymentFail(orderId))}
+          >
+            ✗ Pay Fail
+          </button>
+        </div>
+      </>
+    );
+  } else if (status === 'RECEIVED_BY_KITCHEN') {
+    content = (
+      <button
+        className="btn btn-primary action-btn"
+        disabled={busy}
+        onClick={() => trigger(() => kitchenPrepare(orderId))}
+      >
+        🍳 Start Preparing
+      </button>
+    );
+  } else if (status === 'PREPARING') {
+    content = (
+      <button
+        className="btn btn-primary action-btn"
+        disabled={busy}
+        onClick={() => trigger(() => kitchenReady(orderId))}
+      >
+        ✅ Mark Ready
+      </button>
+    );
+  } else if (status === 'PREPARED') {
+    content = waiting('Waiting for delivery-service to assign a driver… (DRIVER_ASSIGNED coming via Kafka)');
+  } else if (status === 'DRIVER_ASSIGNED') {
+    content = (
+      <button
+        className="btn btn-primary action-btn"
+        disabled={busy}
+        onClick={() => trigger(() => deliveryPickup(orderId))}
+      >
+        📦 Picked Up
+      </button>
+    );
+  } else if (status === 'PICKED_UP') {
+    content = (
+      <button
+        className="btn btn-primary action-btn"
+        disabled={busy}
+        onClick={() => trigger(() => deliveryEnroute(orderId))}
+      >
+        🚗 En Route
+      </button>
+    );
+  } else if (status === 'ENROUTE') {
+    content = (
+      <button
+        className="btn btn-primary action-btn"
+        disabled={busy}
+        onClick={() => trigger(() => deliveryDeliver(orderId))}
+      >
+        🏠 Delivered
+      </button>
+    );
+  } else if (status === 'DELIVERED' || status === 'COMPLETED') {
+    content = <div className="action-waiting">✓ Order complete — no further actions.</div>;
+  }
+
+  if (!content) return null;
+
+  return (
+    <div className="card action-panel">
+      <h3 className="card-title">⚡ Next Action</h3>
+      {content}
+      {busy && <div className="action-waiting">Sending to Kafka…</div>}
+      {actionError && <div className="alert alert-error">{actionError}</div>}
+    </div>
+  );
 }
 
 export default function TrackOrder({ orderId, setOrderId }) {
@@ -20,34 +156,21 @@ export default function TrackOrder({ orderId, setOrderId }) {
   const [liveStatus, setLiveStatus] = useState(null);
   const eventSourceRef = useRef(null);
 
-  // Keep the text input in sync when another tab (Place Order / All Orders)
-  // hands off a new order id.
   useEffect(() => {
     setInputValue(orderId || '');
-    if (orderId) {
-      loadOrder(orderId);
-    }
+    if (orderId) loadOrder(orderId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
 
   useEffect(() => {
-    return () => {
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-      }
-    };
+    return () => { if (eventSourceRef.current) eventSourceRef.current.close(); };
   }, []);
 
   function connectStream(id) {
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
-    }
+    if (eventSourceRef.current) { eventSourceRef.current.close(); eventSourceRef.current = null; }
     if (!id) return;
-
     const es = new EventSource(orderStreamUrl(id));
     eventSourceRef.current = es;
-
     es.addEventListener('status', (evt) => {
       try {
         const payload = JSON.parse(evt.data);
@@ -55,21 +178,11 @@ export default function TrackOrder({ orderId, setOrderId }) {
         setOrder((prev) => (prev ? { ...prev, status: payload.status } : prev));
         setHistory((prev) => [
           ...prev,
-          {
-            status: payload.status,
-            note: payload.note,
-            createdAt: payload.timestamp,
-            sourceTopic: payload.sourceTopic,
-          },
+          { status: payload.status, note: payload.note, createdAt: payload.timestamp, sourceTopic: payload.sourceTopic },
         ]);
-      } catch {
-        /* ignore malformed event */
-      }
+      } catch { /* ignore malformed */ }
     });
-
-    es.onerror = () => {
-      // EventSource auto-reconnects; nothing to do, but avoid unhandled noise.
-    };
+    es.onerror = () => {};
   }
 
   async function loadOrder(id) {
@@ -116,15 +229,13 @@ export default function TrackOrder({ orderId, setOrderId }) {
       <div className="panel-header">
         <h2>Track Order</h2>
         <p className="panel-subtitle">
-          Live status via SSE — the stepper below updates automatically as Kafka events flow
-          through the saga.
+          Step through the order lifecycle manually — each button publishes a Kafka event to the
+          owning microservice. Watch it appear in Kafka-UI and the status update via SSE.
         </p>
       </div>
 
       <div className="card track-input-card">
-        <label className="field-label" htmlFor="orderIdInput">
-          Order ID
-        </label>
+        <label className="field-label" htmlFor="orderIdInput">Order ID</label>
         <div className="track-input-row">
           <input
             id="orderIdInput"
@@ -156,9 +267,7 @@ export default function TrackOrder({ orderId, setOrderId }) {
               </div>
               <div>
                 <div className="meta-label">Amount</div>
-                <div className="meta-value">
-                  ${Number(order.paymentAmount ?? order.amount ?? 0).toFixed(2)}
-                </div>
+                <div className="meta-value">${Number(order.paymentAmount ?? order.amount ?? 0).toFixed(2)}</div>
               </div>
               <div>
                 <div className="meta-label">Status</div>
@@ -172,11 +281,15 @@ export default function TrackOrder({ orderId, setOrderId }) {
             </div>
             {liveStatus && (
               <div className="live-indicator">
-                <span className="live-dot" /> live update received at{' '}
-                {formatTime(liveStatus.timestamp)}
+                <span className="live-dot" /> live update received at {formatTime(liveStatus.timestamp)}
               </div>
             )}
           </div>
+
+          {/* Action panel — shown above the stepper so it's the first thing you see */}
+          {!isCancelled && (
+            <ActionPanel status={status} orderId={order.orderId} />
+          )}
 
           {isCancelled ? (
             <div className="card cancelled-banner">
@@ -193,9 +306,7 @@ export default function TrackOrder({ orderId, setOrderId }) {
                   return (
                     <div className="stepper-item" key={stage}>
                       <div
-                        className={`stepper-dot ${completed ? 'completed' : ''} ${
-                          current ? 'current' : ''
-                        }`}
+                        className={`stepper-dot ${completed ? 'completed' : ''} ${current ? 'current' : ''}`}
                         style={{
                           backgroundColor: completed || current ? color : undefined,
                           borderColor: color,
@@ -232,9 +343,7 @@ export default function TrackOrder({ orderId, setOrderId }) {
                   <div className="timeline-body">
                     <div className="timeline-status">{h.status}</div>
                     {h.note && <div className="timeline-note">{h.note}</div>}
-                    {h.sourceTopic && (
-                      <div className="timeline-topic">source: {h.sourceTopic}</div>
-                    )}
+                    {h.sourceTopic && <div className="timeline-topic">source: {h.sourceTopic}</div>}
                   </div>
                   <div className="timeline-time">{formatTime(h.createdAt || h.timestamp)}</div>
                 </li>

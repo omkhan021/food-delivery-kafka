@@ -1,8 +1,8 @@
 {
-    "order-service":  3068,
-    "payment-service":  18668,
-    "kitchen-service":  17212,
-    "delivery-service":  62216,
-    "notification-service":  60960,
-    "frontend":  12880
+    "order-service":  64508,
+    "payment-service":  22212,
+    "kitchen-service":  65896,
+    "delivery-service":  39404,
+    "notification-service":  36560,
+    "frontend":  62144
 }

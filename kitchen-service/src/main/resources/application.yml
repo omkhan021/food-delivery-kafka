@@ -63,6 +63,16 @@ management:
   endpoint:
     health:
       show-details: when-authorized
+  info:
+    env:
+      enabled: true
+
+info:
+  app:
+    name: kitchen-service
+    version: 1.0.0
+    description: "Kitchen prep simulation — processes PAYMENT_COMPLETED, emits ORDER_RECEIVED / PREPARING / PREPARED"
+    port: 8083
 
 app:
   cors:

@@ -57,6 +57,16 @@ management:
   endpoint:
     health:
       show-details: when-authorized
+  info:
+    env:
+      enabled: true
+
+info:
+  app:
+    name: delivery-service
+    version: 1.0.0
+    description: "Driver & delivery simulation — processes ORDER_PREPARED, emits DRIVER_ASSIGNED / PICKED_UP / ENROUTE / DELIVERED"
+    port: 8084
 
 # Demo-friendly delay configuration for the delivery state machine.
 # Kept short (a few seconds) so the end-to-end saga is visible in the UI quickly.

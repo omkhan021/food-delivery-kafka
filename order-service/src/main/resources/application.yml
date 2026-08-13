@@ -75,6 +75,16 @@ management:
   endpoint:
     health:
       show-details: when-authorized
+  info:
+    env:
+      enabled: true
+
+info:
+  app:
+    name: order-service
+    version: 1.0.0
+    description: "Saga initiator & finalizer — owns order lifecycle, SSE streaming, Kafka admin/replay API"
+    port: 8081
 
 logging:
   level:

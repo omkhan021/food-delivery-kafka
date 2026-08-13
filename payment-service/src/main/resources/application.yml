@@ -76,6 +76,16 @@ management:
   endpoint:
     health:
       show-details: when-authorized
+  info:
+    env:
+      enabled: true
+
+info:
+  app:
+    name: payment-service
+    version: 1.0.0
+    description: "Dummy payment gateway simulation — processes ORDER_PLACED events, emits PAYMENT_COMPLETED or PAYMENT_FAILED"
+    port: 8082
 
 logging:
   level:

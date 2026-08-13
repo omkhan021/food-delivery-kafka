@@ -2,18 +2,11 @@ package com.fooddelivery.delivery.controller;
 
 import com.fooddelivery.delivery.entity.Delivery;
 import com.fooddelivery.delivery.service.DeliveryService;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-/**
- * Read-only REST API for deliveries, per ARCHITECTURE.md section 8. There is no write endpoint —
- * every row is created and progressed exclusively via the Kafka-driven state machine in
- * {@link DeliveryService}.
- */
 @RestController
 @RequestMapping("/api/deliveries")
 public class DeliveryController {
@@ -24,20 +17,45 @@ public class DeliveryController {
         this.deliveryService = deliveryService;
     }
 
-    /** Lists all deliveries, newest first. */
+    /** GET /api/deliveries — all deliveries, newest first. */
     @GetMapping
     public List<Delivery> listAll() {
         return deliveryService.findAllNewestFirst();
     }
 
-    /**
-     * Deliveries for a given order, newest first. Returned as a list (rather than a single
-     * object) because a topic replay could in principle redeliver a PREPARED event and create
-     * more than one row for the same order - the list makes that visible instead of silently
-     * picking one.
-     */
+    /** GET /api/deliveries/order/{orderId} — deliveries for a given order. */
     @GetMapping("/order/{orderId}")
     public List<Delivery> findByOrderId(@PathVariable String orderId) {
         return deliveryService.findByOrderId(orderId);
+    }
+
+    /**
+     * POST /api/deliveries/{orderId}/pickup
+     * Manual trigger: ASSIGNED → PICKED_UP, publishes PICKED_UP to delivery-events.
+     */
+    @PostMapping("/{orderId}/pickup")
+    public ResponseEntity<Void> pickup(@PathVariable String orderId) {
+        deliveryService.manualPickup(orderId);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * POST /api/deliveries/{orderId}/enroute
+     * Manual trigger: PICKED_UP → ENROUTE, publishes ENROUTE to delivery-events.
+     */
+    @PostMapping("/{orderId}/enroute")
+    public ResponseEntity<Void> enroute(@PathVariable String orderId) {
+        deliveryService.manualEnroute(orderId);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * POST /api/deliveries/{orderId}/deliver
+     * Manual trigger: ENROUTE → DELIVERED, publishes DELIVERED to delivery-events.
+     */
+    @PostMapping("/{orderId}/deliver")
+    public ResponseEntity<Void> deliver(@PathVariable String orderId) {
+        deliveryService.manualDeliver(orderId);
+        return ResponseEntity.ok().build();
     }
 }

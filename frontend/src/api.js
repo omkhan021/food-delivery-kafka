@@ -1,4 +1,4 @@
-import { API_BASE_ORDER, API_BASE_NOTIFICATION } from './config';
+import { API_BASE_ORDER, API_BASE_PAYMENT, API_BASE_KITCHEN, API_BASE_DELIVERY, API_BASE_NOTIFICATION } from './config';
 
 async function handle(res) {
   if (!res.ok) {
@@ -55,6 +55,50 @@ export function replayFromBeginning(listenerId) {
 
 export function orderStreamUrl(orderId) {
   return `${API_BASE_ORDER}/api/orders/${encodeURIComponent(orderId)}/stream`;
+}
+
+// ---- manual stage triggers ----
+
+export function paymentComplete(orderId) {
+  return fetch(`${API_BASE_PAYMENT}/api/payments/${encodeURIComponent(orderId)}/complete`, {
+    method: 'POST',
+  }).then(handle);
+}
+
+export function paymentFail(orderId) {
+  return fetch(`${API_BASE_PAYMENT}/api/payments/${encodeURIComponent(orderId)}/fail`, {
+    method: 'POST',
+  }).then(handle);
+}
+
+export function kitchenPrepare(orderId) {
+  return fetch(`${API_BASE_KITCHEN}/api/kitchen/${encodeURIComponent(orderId)}/prepare`, {
+    method: 'POST',
+  }).then(handle);
+}
+
+export function kitchenReady(orderId) {
+  return fetch(`${API_BASE_KITCHEN}/api/kitchen/${encodeURIComponent(orderId)}/ready`, {
+    method: 'POST',
+  }).then(handle);
+}
+
+export function deliveryPickup(orderId) {
+  return fetch(`${API_BASE_DELIVERY}/api/deliveries/${encodeURIComponent(orderId)}/pickup`, {
+    method: 'POST',
+  }).then(handle);
+}
+
+export function deliveryEnroute(orderId) {
+  return fetch(`${API_BASE_DELIVERY}/api/deliveries/${encodeURIComponent(orderId)}/enroute`, {
+    method: 'POST',
+  }).then(handle);
+}
+
+export function deliveryDeliver(orderId) {
+  return fetch(`${API_BASE_DELIVERY}/api/deliveries/${encodeURIComponent(orderId)}/deliver`, {
+    method: 'POST',
+  }).then(handle);
 }
 
 // ---- notification-service ----
