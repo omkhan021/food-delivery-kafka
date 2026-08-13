@@ -35,7 +35,7 @@ services:
     image: provectuslabs/kafka-ui:latest
     container_name: fooddelivery-kafka-ui
     ports:
-      - "8080:8080"     # open http://localhost:8080 to browse topics/messages/consumer groups visually
+      - "8090:8080"     # open http://localhost:8090 to browse topics/messages/consumer groups visually
     environment:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:19092

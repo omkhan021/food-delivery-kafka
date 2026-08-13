@@ -61,7 +61,7 @@ This creates the `fooddelivery` database and 5 schemas (one per service). Each s
 docker compose up -d
 ```
 
-This starts a single-node Kafka broker (KRaft mode, no Zookeeper) on `localhost:9092`, and **Kafka-UI** on [http://localhost:8080](http://localhost:8080) — open that in a browser to visually watch topics, partitions, messages, and consumer-group lag in real time as you use the app. It's the best companion view alongside the app's own Admin tab.
+This starts a single-node Kafka broker (KRaft mode, no Zookeeper) on `localhost:9092`, and **Kafka-UI** on [http://localhost:8090](http://localhost:8090) — open that in a browser to visually watch topics, partitions, messages, and consumer-group lag in real time as you use the app. It's the best companion view alongside the app's own Admin tab.
 
 Wait ~15s for the healthcheck to pass before starting the services (`docker compose ps` should show `kafka` as healthy).
 
@@ -83,7 +83,8 @@ Each prints Flyway migration logs on first boot (creating its tables) — check 
 
 **Windows shortcut:** `.\start-all.ps1` launches all 5 services (+ the frontend) at once, each in its own titled PowerShell window, so you can watch logs live and stop any single one independently (Ctrl+C in its window, or `.\stop-one.ps1 -Service order-service`). `.\stop-all.ps1` shuts everything down together.
 - `-NoFrontend` — skip launching the frontend.
-- `-DbUsername` / `-DbPassword` — override the Postgres credentials passed to all 5 services (default `postgres`/`postgres`).
+- `-DbUsername` / `-DbPassword` — override the Postgres credentials passed to all 5 services (default `postgres`/`admin123`).
+- `-NoDebug` — skip the JVM debug agent (slightly faster startup). By default each service starts with a JDWP agent on its own port (5005–5009, `suspend=n`) so you can attach an IDE debugger at any time without restarting.
 - The frontend window auto-runs `npm install` the first time if `node_modules` isn't there yet.
 
 These just wrap the same `mvn spring-boot:run` / `npm run dev` commands above — nothing magic, just convenience.
@@ -102,7 +103,7 @@ Open [http://localhost:5173](http://localhost:5173).
 
 1. **Place Order** tab — pick some food items, submit. You're taken straight to **Track Order**, which opens a live SSE connection and the stepper starts advancing on its own over the next ~20-30 seconds as the backend services process the saga (payment → kitchen → delivery), each stage's timing configurable per-service (see each service's `README.md` / `application.yml` for the `*.delay-ms` properties — they're deliberately short for demo purposes).
 2. Watch the **Kafka Activity** tab at the same time — every event from every topic streams in live, color-coded by topic.
-3. Open **Kafka-UI** ([localhost:8080](http://localhost:8080)) in another window and watch the same messages land in the actual topics, inspect a message's raw JSON, and see consumer-group offsets move.
+3. Open **Kafka-UI** ([localhost:8090](http://localhost:8090)) in another window and watch the same messages land in the actual topics, inspect a message's raw JSON, and see consumer-group offsets move.
 4. About 15% of orders will fail payment (configurable via `payment.failure-rate` in payment-service) — place a few orders to see the `CANCELLED` path too.
 5. **All Orders** tab lists everything you've placed; click any row to jump back into Track Order.
 

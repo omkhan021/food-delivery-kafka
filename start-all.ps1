@@ -9,12 +9,21 @@ Prereqs this script does NOT start for you:
   - Postgres: must already be running locally
 
 Usage:
-  .\start-all.ps1                 # 5 backend services + frontend
+  .\start-all.ps1                 # 5 backend services + frontend, debug ports open
   .\start-all.ps1 -NoFrontend     # backend services only
+  .\start-all.ps1 -NoDebug        # skip JVM debug agent (slightly faster startup)
+
+Debug ports (suspend=n — JVM starts immediately, attach your IDE at any time):
+  order-service        5005
+  payment-service      5006
+  kitchen-service      5007
+  delivery-service     5008
+  notification-service 5009
 #>
 
 param(
     [switch]$NoFrontend,
+    [switch]$NoDebug,
     [string]$DbUsername = 'postgres',
     [string]$DbPassword = 'admin123'
 )
@@ -22,18 +31,18 @@ param(
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
 
+# Each backend service gets its own JDWP debug port so you can attach
+# an IDE debugger to any one of them independently without port conflicts.
+# suspend=n means the JVM starts immediately — attach whenever you want.
 $services = [ordered]@{
-    'order-service'        = @{ Path = Join-Path $root 'order-service';        Cmd = 'mvn spring-boot:run'; Port = 8081; IsBackend = $true }
-    'payment-service'      = @{ Path = Join-Path $root 'payment-service';      Cmd = 'mvn spring-boot:run'; Port = 8082; IsBackend = $true }
-    'kitchen-service'      = @{ Path = Join-Path $root 'kitchen-service';      Cmd = 'mvn spring-boot:run'; Port = 8083; IsBackend = $true }
-    'delivery-service'     = @{ Path = Join-Path $root 'delivery-service';     Cmd = 'mvn spring-boot:run'; Port = 8084; IsBackend = $true }
-    'notification-service' = @{ Path = Join-Path $root 'notification-service'; Cmd = 'mvn spring-boot:run'; Port = 8085; IsBackend = $true }
+    'order-service'        = @{ Path = Join-Path $root 'order-service';        Port = 8081; DebugPort = 5005; IsBackend = $true }
+    'payment-service'      = @{ Path = Join-Path $root 'payment-service';      Port = 8082; DebugPort = 5006; IsBackend = $true }
+    'kitchen-service'      = @{ Path = Join-Path $root 'kitchen-service';      Port = 8083; DebugPort = 5007; IsBackend = $true }
+    'delivery-service'     = @{ Path = Join-Path $root 'delivery-service';     Port = 8084; DebugPort = 5008; IsBackend = $true }
+    'notification-service' = @{ Path = Join-Path $root 'notification-service'; Port = 8085; DebugPort = 5009; IsBackend = $true }
 }
 if (-not $NoFrontend) {
-    # Auto npm-install on first run (or whenever node_modules is missing) so `npm run dev`
-    # doesn't fail with "'vite' is not recognized" the first time you launch this.
-    $frontendCmd = 'if (-not (Test-Path .\node_modules)) { npm install }; npm run dev'
-    $services['frontend'] = @{ Path = Join-Path $root 'frontend'; Cmd = $frontendCmd; Port = 5173; IsBackend = $false }
+    $services['frontend'] = @{ Path = Join-Path $root 'frontend'; Port = 5173; DebugPort = $null; IsBackend = $false }
 }
 
 function Test-PortOpen {
@@ -60,18 +69,28 @@ foreach ($name in $services.Keys) {
     $svc = $services[$name]
     Write-Host "Starting $name (port $($svc.Port))..." -ForegroundColor Cyan
 
-    $title = "{0} (:{1})" -f $name, $svc.Port
     if ($svc.IsBackend) {
-        # DB_USERNAME/DB_PASSWORD are read by each service's application.yml
-        # (defaults to postgres/postgres if not set) -- override here to match
-        # your actual local Postgres credentials, e.g.:
-        #   .\start-all.ps1 -DbPassword 'yourrealpassword'
         $envPrefix = "`$env:DB_USERNAME='{0}'; `$env:DB_PASSWORD='{1}'; " -f $DbUsername, $DbPassword
+
+        if (-not $NoDebug) {
+            $jvmArgs = '-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:{0}' -f $svc.DebugPort
+            $mvnCmd  = 'mvn spring-boot:run "-Dspring-boot.run.jvmArguments={0}"' -f $jvmArgs
+        } else {
+            $mvnCmd  = 'mvn spring-boot:run'
+        }
+
+        $cmd = $envPrefix + $mvnCmd
     }
     else {
-        $envPrefix = ''
+        # Frontend — no DB env, no debug agent; auto npm-install on first run
+        $cmd = 'if (-not (Test-Path .\node_modules)) { npm install }; npm run dev'
     }
-    $innerCommand = "`$host.UI.RawUI.WindowTitle = '{0}'; {1}{2}" -f $title, $envPrefix, $svc.Cmd
+
+    $title        = '{0} (:{1})' -f $name, $svc.Port
+    $innerCommand = '`$host.UI.RawUI.WindowTitle = ''{0}''; {1}' -f $title, $cmd
+    # Use -f so the title and command are fully expanded before being passed to
+    # the child powershell.exe — avoids nested-quote / backtick parse errors.
+    $innerCommand = "`$host.UI.RawUI.WindowTitle = '{0}'; {1}" -f $title, $cmd
 
     $startArgs = @{
         FilePath         = 'powershell.exe'
@@ -88,6 +107,15 @@ $procIds | ConvertTo-Json | Set-Content -Path (Join-Path $root '.run-pids.json')
 
 Write-Host ""
 Write-Host "All services launching in separate windows. PIDs saved to .run-pids.json" -ForegroundColor Green
+if (-not $NoDebug) {
+    Write-Host "Debug agents listening (suspend=n):" -ForegroundColor Yellow
+    Write-Host "  order-service        -> localhost:5005"
+    Write-Host "  payment-service      -> localhost:5006"
+    Write-Host "  kitchen-service      -> localhost:5007"
+    Write-Host "  delivery-service     -> localhost:5008"
+    Write-Host "  notification-service -> localhost:5009"
+    Write-Host ""
+}
 Write-Host "Stop everything:  .\stop-all.ps1"
 Write-Host "Stop just one:    .\stop-one.ps1 -Service order-service"
 Write-Host "...or just close / Ctrl+C the window for the one you want to stop."
