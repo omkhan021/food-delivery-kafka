@@ -13,7 +13,7 @@ Usage:
   .\start-all.ps1 -NoFrontend     # backend services only
   .\start-all.ps1 -NoDebug        # skip JVM debug agent (slightly faster startup)
 
-Debug ports (suspend=n — JVM starts immediately, attach your IDE at any time):
+Debug ports (suspend=n, loopback-only — attach your IDE at any time):
   order-service        5005
   payment-service      5006
   kitchen-service      5007
@@ -73,7 +73,7 @@ foreach ($name in $services.Keys) {
         $envPrefix = "`$env:DB_USERNAME='{0}'; `$env:DB_PASSWORD='{1}'; " -f $DbUsername, $DbPassword
 
         if (-not $NoDebug) {
-            $jvmArgs = '-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:{0}' -f $svc.DebugPort
+            $jvmArgs = '-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address={0}' -f $svc.DebugPort
             $mvnCmd  = 'mvn spring-boot:run "-Dspring-boot.run.jvmArguments={0}"' -f $jvmArgs
         } else {
             $mvnCmd  = 'mvn spring-boot:run'
